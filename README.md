@@ -2,6 +2,9 @@
 
 X number of movies and shows picked every day, based on what your users watch.
 
+<img width="1248" height="702" alt="image" src="https://github.com/user-attachments/assets/4d3a3bc4-5dde-4fd8-9583-84fc2bb31d0d" />
+
+
 ## What you get
 
 Jellyfin apps come in two kinds, and the plugin reaches each in its own way:
