@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.1.0.0",
+        "changelog": "Add library tile image: daily poster collage or your own picture\n\nThe Daily Picks library tile (My Media on TV apps) now shows a collage of today's\n10 posters with the title, redrawn when the picks change. The settings page can\nswitch to an uploaded picture (admins only, PNG/JPEG/WebP checked by content),\nwith a preview of the current tile.\n\nThe collage uses the server's SkiaSharp and falls back to Jellyfin's own library\nimage style if it is missing. Saving settings that don't affect the picks no\nlonger remakes them.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+        "targetAbi": "12.4.0.0",
+        "sourceUrl": "https://github.com/dodocousin/Jellyfin-plugin-dailypicks/releases/download/v1.1.0/daily-picks_1.1.0.0.zip",
+        "checksum": "a5f70b36826c1dd43cf28972cf061ac2",
+        "timestamp": "2026-10-31T13:37:55Z"
+      },
+      {
         "version": "1.0.1.0",
         "changelog": "Fix empty household picks when a user can't see any library\n\nHousehold picks were limited to titles every enabled user can see, so one account\nwithout library access left nothing to pick and the library was never created.\nOnly users who can open the Daily Picks library now count. Empty results are no\nlonger saved for the day, and the log explains why nothing was picked.\n\nLoad the catalog and watch history once per refresh, make every user's picks in\nthe background task, and log how long loading takes.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
         "targetAbi": "12.4.0.0",
