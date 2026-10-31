@@ -22,7 +22,8 @@ They are made at 00:01 (server time) and again whenever the settings are saved.
 4. **Skipped**: movies they've seen or started (Continue Watching covers those) and shows they've started (Next Up covers those).
    Optionally, favorites not watched in a year can come back.
 5. **Household picks** (TV library): everyone's taste counts equally, titles most of the house has seen are skipped, and only
-   titles **every user is allowed to see** are used (library access and parental ratings), because the library is shared.
+   titles **every user who can see the Daily Picks library is allowed to watch** are used (library access and parental
+   ratings), because the library is shared.
 
 Settings → *Users whose viewing shapes the picks* lets you leave out guest accounts. *Pick mode: Random* brings back plain random
 picks. Picks are remembered in `plugins/Jellyfin.Plugin.DailyPicks/pick-history.json` (60 days).
@@ -35,7 +36,7 @@ The taste logic is in `Recommendations/TasteEngine.cs` and is covered by tests i
 Jellyfin 12 refuses `.strm` files that point to local files, so the library holds **hard links** to the picked files:
 they take no extra disk space, play exactly like the original, and deleting them never touches the original.
 Hard links only work within one drive, so the plugin creates a `Jellyfin Daily Picks` folder at the root of each drive
-holding picked media (e.g. `J:\Jellyfin Daily Picks`). If a hard link isn't possible it tries a symbolic link, and
+holding picked media (e.g. `D:\Jellyfin Daily Picks`). If a hard link isn't possible it tries a symbolic link, and
 otherwise skips that title. For a picked show only the **first season** is linked (the lowest regular season with files;
 specials only if there is nothing else), so the nightly refresh and scan stay small however long the show is. To keep
 watching after that season, continue in the regular TV library. External subtitles next to the file are linked too. Titles, plots, posters and backdrops are
@@ -54,10 +55,11 @@ Things to know:
 
 ## Install
 
-Requires Jellyfin 12.4 or newer. Add this plugin repository in **Dashboard → Plugins → Repositories**:
+Requires Jellyfin 12.4 or newer on Windows (Linux and Docker aren't supported yet). Add this plugin repository in
+**Dashboard → Plugins → Manage Repositories**:
 
 ```
-https://raw.githubusercontent.com/dodocousin/jellyfin-plugin-dailypicks/main/manifest.json
+https://raw.githubusercontent.com/dodocousin/Jellyfin-plugin-dailypicks/main/manifest.json
 ```
 
 then install **Daily Picks** from the catalog and restart Jellyfin. Step-by-step guide: [INSTALL.md](INSTALL.md).
@@ -67,7 +69,7 @@ Settings: **Dashboard → Plugins → Daily Picks**. Scheduled task: **Dashboard
 ## Build and release
 
 ```powershell
-dotnet test                 # 15 tests for the taste engine
+dotnet test                 # taste engine and season tests
 dotnet build -c Release     # Jellyfin.Plugin.DailyPicks/bin/Release/net10.0/Jellyfin.Plugin.DailyPicks.dll
 ```
 
@@ -83,7 +85,7 @@ git push origin v1.0.1
 
 The plugin adds a `<script>` tag to `jellyfin-web\index.html` at startup. If Jellyfin can't write that file (common when it
 runs from `C:\Program Files` as a normal user), the server log says so. Either give Jellyfin write access to that folder
-(see [INSTALL.md](INSTALL.md), step 6), or add this line yourself just before `</body>`:
+(see [INSTALL.md](INSTALL.md), step 5), or add this line yourself just before `</body>`:
 
 ```html
 <script plugin="DailyPicks" defer src="../DailyPicks/ClientScript"></script>
