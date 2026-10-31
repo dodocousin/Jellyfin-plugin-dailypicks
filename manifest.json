@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.1.1.0",
+        "changelog": "Link only the first season of a picked show\n\nA picked show used to get a link, NFO and thumbnail for every episode, which on a\nlarge library meant thousands of NAS writes and a long scan each night. Only the\nfirst regular season with files is linked now (specials if there is nothing else),\nand files are only checked for that season.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+        "targetAbi": "12.4.0.0",
+        "sourceUrl": "https://github.com/dodocousin/Jellyfin-plugin-dailypicks/releases/download/v1.1.1/daily-picks_1.1.1.0.zip",
+        "checksum": "605aadb96a2507b7c8f730402ca00f45",
+        "timestamp": "2026-10-31T13:49:03Z"
+      },
+      {
         "version": "1.1.0.0",
         "changelog": "Add library tile image: daily poster collage or your own picture\n\nThe Daily Picks library tile (My Media on TV apps) now shows a collage of today's\n10 posters with the title, redrawn when the picks change. The settings page can\nswitch to an uploaded picture (admins only, PNG/JPEG/WebP checked by content),\nwith a preview of the current tile.\n\nThe collage uses the server's SkiaSharp and falls back to Jellyfin's own library\nimage style if it is missing. Saving settings that don't affect the picks no\nlonger remakes them.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
         "targetAbi": "12.4.0.0",
