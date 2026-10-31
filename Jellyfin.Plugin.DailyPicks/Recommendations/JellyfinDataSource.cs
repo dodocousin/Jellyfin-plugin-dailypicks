@@ -49,6 +49,19 @@ public class JellyfinDataSource
     }
 
     /// <summary>
+    /// Checks whether a user can open the Daily Picks library. Users limited to chosen libraries don't get new libraries
+    /// automatically, so they only see it if an admin adds it for them.
+    /// </summary>
+    /// <param name="user">The user.</param>
+    /// <param name="libraryId">The Daily Picks library id, if it exists yet.</param>
+    /// <returns>True if the user sees the library.</returns>
+    public static bool CanSeeLibrary(User user, Guid? libraryId)
+    {
+        return user.HasPermission(PermissionKind.EnableAllFolders)
+            || (libraryId is Guid id && user.GetPreferenceValues<Guid>(PreferenceKind.EnabledFolders).Contains(id));
+    }
+
+    /// <summary>
     /// Gets a user by id.
     /// </summary>
     /// <param name="id">User id.</param>

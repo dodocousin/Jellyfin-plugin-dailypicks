@@ -166,7 +166,11 @@ public class DailyPicksLibrary
 
         if (library is null)
         {
-            if (wanted.Count > 0)
+            if (wanted.Count == 0)
+            {
+                _logger.LogWarning("Daily Picks: no picks to put in the library, so it isn't created yet (see the messages above)");
+            }
+            else
             {
                 await CreateLibraryAsync(wanted.Keys).ConfigureAwait(false);
                 _logger.LogInformation("Daily Picks: created library {Name} in {Roots}", Plugin.Instance!.Configuration.Title, string.Join(", ", wanted.Keys));
