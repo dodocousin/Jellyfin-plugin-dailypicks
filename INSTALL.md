@@ -77,6 +77,8 @@ On its first start the plugin makes today's picks and creates the **Daily Picks*
 - **Pick mode:** *Smart* (default).
 - **Users whose viewing shapes the picks:** untick guest or shared accounts.
 - Keep **Show a home row** and **Keep a Daily Picks library** ticked.
+- **Library tile image:** *Collage of today's picks* (default, redrawn every night) or *My own picture*: choose a PNG,
+  JPEG or WebP file (a wide 16:9 picture fits best). It's applied as soon as it's uploaded, with a preview below.
 - **Save.** Saving makes today's picks again with the new settings.
 
 ### 5. Check the TV library

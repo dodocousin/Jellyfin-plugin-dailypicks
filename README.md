@@ -44,6 +44,8 @@ Things to know:
 - The plugin won't use a `Jellyfin Daily Picks` folder that sits inside another library (e.g. a library pointing at a whole drive),
   so picks never appear twice inside a regular library.
 - In the web client, the library's own "Recently added" row is hidden, since the custom row already shows the picks.
+- The library tile (in "My Media" on TV apps) shows a collage of today's 10 posters with the title on it, redrawn every night.
+  Settings → *Library tile image* can use your own picture instead (PNG, JPEG or WebP; 16:9 fits best).
 - A hard link is the same file as the original, so it can't be removed while anyone has the original open (someone watching it,
   another server reading it). Such a title is left intact and removed at a later refresh (every 3 hours).
 

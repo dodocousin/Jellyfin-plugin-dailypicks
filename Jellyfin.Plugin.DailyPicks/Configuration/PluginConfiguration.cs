@@ -69,6 +69,11 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool EnableLibrary { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets a value indicating whether the library tile uses the uploaded picture instead of a collage of today's picks.
+    /// </summary>
+    public bool UseCustomLibraryImage { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether the home row is injected into the web client (browser, Jellyfin Media Player, webOS, Tizen).
     /// </summary>
     public bool EnableHomeRow { get; set; } = true;

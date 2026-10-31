@@ -23,10 +23,12 @@ public class DailyPicksService
     private readonly JellyfinDataSource _data;
     private readonly PickHistoryStore _store;
     private readonly DailyPicksLibrary _library;
+    private readonly LibraryImageService _image;
     private readonly ILogger<DailyPicksService> _logger;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
     private readonly object _pickLock = new();
     private Snapshot? _snapshot;
+    private string _pickSettings;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DailyPicksService"/> class.
@@ -34,24 +36,35 @@ public class DailyPicksService
     /// <param name="data">Jellyfin data for the taste engine.</param>
     /// <param name="store">Pick history.</param>
     /// <param name="library">Daily Picks library.</param>
+    /// <param name="image">Library tile image.</param>
     /// <param name="logger">Logger.</param>
-    public DailyPicksService(JellyfinDataSource data, PickHistoryStore store, DailyPicksLibrary library, ILogger<DailyPicksService> logger)
+    public DailyPicksService(JellyfinDataSource data, PickHistoryStore store, DailyPicksLibrary library, LibraryImageService image, ILogger<DailyPicksService> logger)
     {
         _data = data;
         _store = store;
         _library = library;
+        _image = image;
         _logger = logger;
 
-        // Saving the settings page makes today's picks again with the new settings and fresh watch history.
+        // Saving the settings page makes today's picks again with fresh watch history, but only when a setting that
+        // affects the picks changed (switching the library image shouldn't reload everyone's history).
+        _pickSettings = PickSettings(Config);
         Plugin.Instance!.ConfigurationChanged += async (_, _) =>
         {
             try
             {
+                var settings = PickSettings(Config);
                 lock (_pickLock)
                 {
-                    _store.ClearDay(DateTime.Now.Date);
-                    _snapshot = null;
+                    if (settings != _pickSettings)
+                    {
+                        _pickSettings = settings;
+                        _store.ClearDay(DateTime.Now.Date);
+                        _snapshot = null;
+                    }
                 }
+
+                _image.Invalidate();
 
                 await SyncAsync(CancellationToken.None).ConfigureAwait(false);
             }
@@ -145,7 +158,9 @@ public class DailyPicksService
 
             if (Config.EnableLibrary)
             {
-                await _library.SyncAsync(household.Select(p => p.ItemId).ToList(), cancellationToken).ConfigureAwait(false);
+                var ids = household.Select(p => p.ItemId).ToList();
+                await _library.SyncAsync(ids, cancellationToken).ConfigureAwait(false);
+                await ApplyImageAsync(ids, cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -158,11 +173,53 @@ public class DailyPicksService
         }
     }
 
+    /// <summary>
+    /// Sets the library tile image again right away (after a picture is uploaded or removed).
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task.</returns>
+    public async Task RefreshLibraryImageAsync(CancellationToken cancellationToken)
+    {
+        _image.Invalidate();
+        if (Config.EnableLibrary)
+        {
+            await ApplyImageAsync(GetHouseholdPicks().Select(p => p.ItemId).ToList(), cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task ApplyImageAsync(IReadOnlyList<Guid> picks, CancellationToken cancellationToken)
+    {
+        // A failed image must never stop the picks themselves.
+        try
+        {
+            await _image.ApplyAsync(_library.GetLibraryId(), picks, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Daily Picks: could not set the library image");
+        }
+    }
+
     private static bool IsPickable(BaseItem item)
     {
         // Never our own links, and only movies that are a plain video file (a link can't point at a disc folder).
         return !DailyPicksLibrary.Contains(item)
             && (item is not Video video || (!video.IsShortcut && video.VideoType == VideoType.VideoFile));
+    }
+
+    private static string PickSettings(PluginConfiguration c)
+    {
+        return string.Join(
+            "|",
+            c.PickMode,
+            c.TotalCount,
+            c.ForYouCount,
+            c.PopularCount,
+            c.AvoidRepeatDays,
+            c.AllowRewatch,
+            c.RewatchAfterDays,
+            c.ShuffleSalt,
+            string.Join(",", c.ExcludedUserIds.Order()));
     }
 
     private static bool IsExcluded(Guid userId)

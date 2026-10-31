@@ -16,6 +16,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<JellyfinDataSource>();
         serviceCollection.AddSingleton<PickHistoryStore>();
         serviceCollection.AddSingleton<DailyPicksLibrary>();
+        serviceCollection.AddSingleton<LibraryImageService>();
         serviceCollection.AddSingleton<DailyPicksService>();
         serviceCollection.AddHostedService<WebClientInjector>();
     }

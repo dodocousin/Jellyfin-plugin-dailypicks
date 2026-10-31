@@ -77,6 +77,23 @@
                         </label>
                         <div class="fieldDescription checkboxFieldDescription">Android TV, Fire TV, Roku and Apple TV show it as a "Recently added in Daily Picks" home row. It holds links to your files (a "Jellyfin Daily Picks" folder at the root of each media drive), not copies. Unchecking it deletes the library and those folders; your files are never touched.</div>
                     </div>
+                    <div class="libraryImageSettings" style="margin: 0 0 2em 0;">
+                        <div class="selectContainer">
+                            <select is="emby-select" id="LibraryImageMode" label="Library tile image (shown in My Media on TV apps)">
+                                <option value="collage">Collage of today's picks (changes every day)</option>
+                                <option value="custom">My own picture</option>
+                            </select>
+                        </div>
+                        <div class="customImageOnly">
+                            <p><input type="file" id="LibraryImageFile" accept="image/png,image/jpeg,image/webp" /></p>
+                            <div class="fieldDescription">PNG, JPEG or WebP, up to 10 MB. A wide 16:9 picture (e.g. 960×540) fits the tile best. It is applied as soon as it is uploaded.</div>
+                            <p>
+                                <button is="emby-button" type="button" id="RemoveLibraryImage" class="raised"><span>Remove picture</span></button>
+                            </p>
+                        </div>
+                        <div id="LibraryImageStatus" class="fieldDescription"></div>
+                        <img id="LibraryImagePreview" alt="Current library image" style="display:none; max-width: 400px; width: 100%; border-radius: .3em; margin-top: .5em;" />
+                    </div>
 
                     <div>
                         <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
@@ -96,6 +113,37 @@
 
                 function toggleSmart() {
                     page.querySelector('.smartOnly').classList.toggle('hide', page.querySelector('#PickMode').value !== 'Smart');
+                }
+
+                function toggleImage() {
+                    page.querySelector('.customImageOnly').classList.toggle('hide', page.querySelector('#LibraryImageMode').value !== 'custom');
+                    page.querySelector('.libraryImageSettings').classList.toggle('hide', !page.querySelector('#EnableLibrary').checked);
+                }
+
+                function showLibraryImage() {
+                    // The current tile, straight from Jellyfin (cache-busted so a new image shows right away).
+                    return ApiClient.getJSON(ApiClient.getUrl('DailyPicks/LibraryImage/Info')).then(function (info) {
+                        const status = page.querySelector('#LibraryImageStatus');
+                        const preview = page.querySelector('#LibraryImagePreview');
+                        status.textContent = info.HasCustomImage ? 'A picture is uploaded.' : 'No picture uploaded yet.';
+                        page.querySelector('#RemoveLibraryImage').classList.toggle('hide', !info.HasCustomImage);
+                        if (!info.LibraryId) {
+                            preview.style.display = 'none';
+                            status.textContent += ' The library doesn\'t exist yet, so there is no tile to preview.';
+                            return;
+                        }
+
+                        preview.onerror = function () { preview.style.display = 'none'; };
+                        preview.src = ApiClient.getImageUrl(info.LibraryId, { type: 'Primary', maxWidth: 800 }) + '&_=' + Date.now();
+                        preview.style.display = '';
+                    });
+                }
+
+                function useCustomImage(enabled) {
+                    page.querySelector('#LibraryImageMode').value = enabled ? 'custom' : 'collage';
+                    toggleImage();
+                    save(function (config) { config.UseCustomLibraryImage = enabled; });
+                    setTimeout(showLibraryImage, 1500);
                 }
 
                 function save(update) {
@@ -118,12 +166,55 @@
                             '<label><input is="emby-checkbox" type="checkbox" class="tasteUser" data-id="' + user.Id + '"'
                             + (excluded.includes(user.Id.replace(/-/g, '').toLowerCase()) ? '' : ' checked') + ' />'
                             + '<span>' + user.Name.replace(/[<>&"]/g, '') + '</span></label>').join('');
+                        page.querySelector('#LibraryImageMode').value = config.UseCustomLibraryImage ? 'custom' : 'collage';
                         toggleSmart();
+                        toggleImage();
                         Dashboard.hideLoadingMsg();
+                        return showLibraryImage();
                     });
                 });
 
                 page.querySelector('#PickMode').addEventListener('change', toggleSmart);
+                page.querySelector('#LibraryImageMode').addEventListener('change', toggleImage);
+                page.querySelector('#EnableLibrary').addEventListener('change', toggleImage);
+
+                page.querySelector('#LibraryImageFile').addEventListener('change', function (e) {
+                    const file = e.target.files[0];
+                    if (!file) {
+                        return;
+                    }
+
+                    if (file.size > 10 * 1024 * 1024) {
+                        Dashboard.alert('The picture must be smaller than 10 MB.');
+                        return;
+                    }
+
+                    // Sent base64-encoded, like Jellyfin's own image upload.
+                    const reader = new FileReader();
+                    reader.onload = function () {
+                        Dashboard.showLoadingMsg();
+                        ApiClient.ajax({
+                            type: 'POST',
+                            url: ApiClient.getUrl('DailyPicks/LibraryImage'),
+                            data: reader.result.split(',')[1],
+                            contentType: file.type
+                        }).then(function () {
+                            useCustomImage(true);
+                        }, function () {
+                            Dashboard.hideLoadingMsg();
+                            Dashboard.alert('Upload failed. Use a PNG, JPEG or WebP picture under 10 MB.');
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                    e.target.value = '';
+                });
+
+                page.querySelector('#RemoveLibraryImage').addEventListener('click', function () {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.ajax({ type: 'DELETE', url: ApiClient.getUrl('DailyPicks/LibraryImage') }).then(function () {
+                        useCustomImage(false);
+                    });
+                });
 
                 page.querySelector('#DailyPicksConfigForm').addEventListener('submit', function (e) {
                     e.preventDefault();
@@ -131,6 +222,7 @@
                     save(function (config) {
                         config.Title = page.querySelector('#Title').value || 'Daily Picks';
                         config.PickMode = page.querySelector('#PickMode').value;
+                        config.UseCustomLibraryImage = page.querySelector('#LibraryImageMode').value === 'custom';
                         numberFields.forEach(f => config[f] = parseInt(page.querySelector('#' + f).value, 10) || 0);
                         checkFields.forEach(f => config[f] = page.querySelector('#' + f).checked);
                         config.ExcludedUserIds = Array.from(page.querySelectorAll('.tasteUser'))
