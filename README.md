@@ -36,7 +36,9 @@ Jellyfin 12 refuses `.strm` files that point to local files, so the library hold
 they take no extra disk space, play exactly like the original, and deleting them never touches the original.
 Hard links only work within one drive, so the plugin creates a `Jellyfin Daily Picks` folder at the root of each drive
 holding picked media (e.g. `J:\Jellyfin Daily Picks`). If a hard link isn't possible it tries a symbolic link, and
-otherwise skips that title. External subtitles next to the file are linked too. Titles, plots, posters and backdrops are
+otherwise skips that title. For a picked show only the **first season** is linked (the lowest regular season with files;
+specials only if there is nothing else), so the nightly refresh and scan stay small however long the show is. To keep
+watching after that season, continue in the regular TV library. External subtitles next to the file are linked too. Titles, plots, posters and backdrops are
 copied from your existing metadata (NFO + images), so nothing is downloaded.
 
 Things to know:

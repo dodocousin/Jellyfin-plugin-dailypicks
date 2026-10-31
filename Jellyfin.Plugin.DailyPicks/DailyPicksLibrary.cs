@@ -101,7 +101,7 @@ public class DailyPicksLibrary
             var mediaPath = item switch
             {
                 Movie movie => movie.Path,
-                Series series => GetEpisodes(series).FirstOrDefault()?.Path,
+                Series series => GetFirstSeasonEpisodes(series).FirstOrDefault()?.Path,
                 _ => null
             };
 
@@ -282,7 +282,7 @@ public class DailyPicksLibrary
         Directory.CreateDirectory(dir);
         var linked = 0;
 
-        foreach (var season in GetEpisodes(series).GroupBy(e => e.ParentIndexNumber!.Value))
+        foreach (var season in GetFirstSeasonEpisodes(series).GroupBy(e => e.ParentIndexNumber!.Value))
         {
             var seasonDir = Path.Combine(dir, string.Format(CultureInfo.InvariantCulture, "Season {0:00}", season.Key));
             Directory.CreateDirectory(seasonDir);
@@ -334,9 +334,21 @@ public class DailyPicksLibrary
         return true;
     }
 
-    private List<Episode> GetEpisodes(Series series)
+    /// <summary>
+    /// The order seasons are tried in for a picked show: regular seasons from the first, specials (season 0) last.
+    /// </summary>
+    /// <param name="seasons">Season numbers of the show.</param>
+    /// <returns>The season numbers in the order to try.</returns>
+    public static IEnumerable<int> SeasonOrder(IEnumerable<int> seasons)
     {
-        return _libraryManager.GetItemList(new InternalItemsQuery
+        return seasons.Distinct().OrderBy(s => s == 0 ? int.MaxValue : s);
+    }
+
+    private List<Episode> GetFirstSeasonEpisodes(Series series)
+    {
+        // Only the first season is linked: enough to start a show from the TV row, and the nightly refresh and scan
+        // stay small however long the show is. Files are only checked for that season (they're on the NAS).
+        var episodes = _libraryManager.GetItemList(new InternalItemsQuery
             {
                 AncestorIds = [series.Id],
                 IncludeItemTypes = [BaseItemKind.Episode],
@@ -344,10 +356,22 @@ public class DailyPicksLibrary
                 IsVirtualItem = false
             })
             .OfType<Episode>()
-            .Where(e => e.ParentIndexNumber.HasValue && e.IndexNumber.HasValue && !e.IsShortcut && e.VideoType == VideoType.VideoFile && File.Exists(e.Path))
-            .OrderBy(e => e.ParentIndexNumber)
-            .ThenBy(e => e.IndexNumber)
+            .Where(e => e.ParentIndexNumber.HasValue && e.IndexNumber.HasValue && !e.IsShortcut && e.VideoType == VideoType.VideoFile)
             .ToList();
+
+        foreach (var season in SeasonOrder(episodes.Select(e => e.ParentIndexNumber!.Value)))
+        {
+            var available = episodes
+                .Where(e => e.ParentIndexNumber == season && File.Exists(e.Path))
+                .OrderBy(e => e.IndexNumber)
+                .ToList();
+            if (available.Count > 0)
+            {
+                return available;
+            }
+        }
+
+        return [];
     }
 
     /// <summary>
