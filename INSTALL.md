@@ -66,23 +66,52 @@ On its first start the plugin makes today's picks and creates the **Daily Picks*
 
 ## 5. Check the home row in the browser
 
-1. Open the Jellyfin home page and press **Ctrl+F5**. A **Daily Picks** row should appear right after **My Media**,
-   with a reason under each poster ("Because you watched ...").
-2. If it's missing, open **Dashboard → Logs**, open the newest log and search for `cannot write`. The plugin has to add
-   one line to `jellyfin-web\index.html` in Jellyfin's install folder (usually `C:\Program Files\Jellyfin\Server`),
-   and Windows only lets administrators change files there.
-   - **Service install** (step 1): the service is normally allowed to. If it runs under a custom account, use the fix below for that account.
-   - **Tray / basic install**: Jellyfin runs as your Windows user, which isn't allowed by default. Fix it once in
-     **PowerShell as administrator** (replace the user name, and the path if Jellyfin is installed elsewhere):
-     ```powershell
-     icacls "C:\Program Files\Jellyfin\Server\jellyfin-web" /grant "YourWindowsUser:(OI)(CI)M"
-     ```
-     Then restart Jellyfin and press Ctrl+F5.
-   - Or add this line yourself just before `</body>` in that `index.html`:
-     ```html
-     <script plugin="DailyPicks" defer src="../DailyPicks/ClientScript"></script>
-     ```
-   A Jellyfin update can replace that folder and its permissions. If the row disappears after a Jellyfin update, do this again.
+Open the Jellyfin home page in a browser and press **Ctrl+F5** (reloads the page completely).
+You should see a **Daily Picks** row right after **My Media**, with a reason under each poster ("Because you watched ...").
+
+**If you see it, you're done with this step.** Most service installs (step 1) land here.
+
+### If the row is missing
+
+**Why it can happen:** to draw the row, the plugin adds one line to the Jellyfin web page, the file `index.html` in the
+`jellyfin-web` folder of Jellyfin's install folder (usually `C:\Program Files\Jellyfin\Server\jellyfin-web`).
+Windows protects `C:\Program Files`: only administrators and system services can change files there. A **tray / basic
+install** (step 1) runs Jellyfin as your normal Windows user, so the plugin isn't allowed to add its line.
+
+**Check which case you're in:** open **Dashboard → Logs**, open the newest log, and search for `Daily Picks:`.
+
+| You find | Meaning |
+|---|---|
+| `home row script added to ...` | The line was added. Press Ctrl+F5 again; if the row is still missing, wait a minute and retry (the first picks may still be in the making, see step 3). |
+| `cannot write ...` | Jellyfin isn't allowed to change the file. Use **fix A** or **fix B** below. |
+| `web client not found at ...` | Jellyfin doesn't serve its own web pages (e.g. a separately hosted web client). The row can't be added there. |
+| None of these | The line was already added on an earlier start, and nothing needed doing. Press Ctrl+F5 again. |
+
+**Fix A: let Jellyfin edit its web folder** (recommended, done once)
+
+1. Find which Windows user runs Jellyfin: open **Task Manager → Details**, find `jellyfin.exe`, and read the
+   **User name** column.
+2. Right-click **Start → Terminal (Admin)** or **Windows PowerShell (Admin)**, and run this command, replacing
+   `YourWindowsUser` with that user name (and the path, if Jellyfin is installed somewhere else):
+   ```powershell
+   icacls "C:\Program Files\Jellyfin\Server\jellyfin-web" /grant "YourWindowsUser:(OI)(CI)M"
+   ```
+   This lets that user modify files in the `jellyfin-web` folder only, nothing else.
+3. Restart Jellyfin, then press **Ctrl+F5** on the home page.
+
+**Fix B: add the line yourself** (if you'd rather not change permissions)
+
+1. Open **Notepad as administrator** (right-click Notepad → *Run as administrator*).
+2. **File → Open** `C:\Program Files\Jellyfin\Server\jellyfin-web\index.html` (choose *All files* to see it).
+3. Paste this line just before `</body>`, near the end of the file, and save:
+   ```html
+   <script plugin="DailyPicks" defer src="../DailyPicks/ClientScript"></script>
+   ```
+4. Press **Ctrl+F5** on the home page.
+
+**After a Jellyfin update:** the update replaces the `jellyfin-web` folder. With fix A, the plugin re-adds its line on the
+next start, unless the update also reset the folder's permissions: if the row is gone, run the fix A command again.
+With fix B, the line is gone and you need to add it again.
 
 ## 6. Check the TV library
 
