@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Daily Picks</title>
+</head>
+<body>
+    <div id="DailyPicksConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox,emby-select">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="DailyPicksConfigForm">
+                    <h2 class="sectionTitle">Daily Picks</h2>
+                    <p>Movies and shows picked every day at midnight (server time).</p>
+
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="Title" label="Title (home row and library name)" />
+                        <div class="fieldDescription">Used when the library is created. To rename an existing library, rename it in Dashboard → Libraries.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="number" id="TotalCount" min="1" max="100" label="Titles per day" />
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="number" id="AvoidRepeatDays" min="0" max="60" label="Avoid repeating picks from the last N days" />
+                    </div>
+
+                    <h3 class="sectionTitle">How titles are picked</h3>
+                    <div class="selectContainer">
+                        <select is="emby-select" id="PickMode" label="Pick mode">
+                            <option value="Smart">Smart: based on what your users watch</option>
+                            <option value="Random">Random</option>
+                        </select>
+                        <div class="fieldDescription">Smart: each user gets their own picks in the web row. The TV library gets household picks, from titles every user is allowed to see.</div>
+                    </div>
+                    <div class="smartOnly">
+                        <div class="inputContainer">
+                            <input is="emby-input" type="number" id="ForYouCount" min="0" max="100" label="Picks matching their taste" />
+                        </div>
+                        <div class="inputContainer">
+                            <input is="emby-input" type="number" id="PopularCount" min="0" max="100" label="Picks popular in the house" />
+                            <div class="fieldDescription">The rest are random discoveries, so picks don't get stuck in one genre. Users with no history yet get popular and random picks.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="ShowReasons" />
+                                <span>Show why each title was picked</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">For example "Because you watched Coraline", under the poster in the web row.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="AllowRewatch" />
+                                <span>Suggest favorites again after a while</span>
+                            </label>
+                        </div>
+                        <div class="inputContainer">
+                            <input is="emby-input" type="number" id="RewatchAfterDays" min="30" max="3650" label="Days before a favorite can come back" />
+                        </div>
+                        <div class="checkboxList paperList" style="padding: .5em 1em;">
+                            <h3 class="checkboxListLabel">Users whose viewing shapes the picks</h3>
+                            <div id="TasteUsers"></div>
+                            <div class="fieldDescription">Untick guest or shared accounts. They still get picks; their viewing just doesn't shape the household picks or "popular".</div>
+                        </div>
+                    </div>
+
+                    <h3 class="sectionTitle">Where picks show up</h3>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="EnableHomeRow" />
+                            <span>Show a home row in the web client</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Browser, Jellyfin Media Player, LG webOS and Samsung Tizen. Users must refresh the page after installing the plugin.</div>
+                    </div>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="EnableLibrary" />
+                            <span>Keep a Daily Picks library for TV apps</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Android TV, Fire TV, Roku and Apple TV show it as a "Recently added in Daily Picks" home row. It holds links to your files (a "Jellyfin Daily Picks" folder at the root of each media drive), not copies. Unchecking it deletes the library and those folders; your files are never touched.</div>
+                    </div>
+
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
+                        <button is="emby-button" type="button" id="Reshuffle" class="raised block"><span>Reshuffle today's picks</span></button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            (function () {
+                const pluginId = '6f0a9d4e-3c1b-4e7a-9b52-d1a7c8e4f2b3';
+                const page = document.querySelector('#DailyPicksConfigPage');
+                const textFields = ['Title', 'PickMode'];
+                const numberFields = ['TotalCount', 'AvoidRepeatDays', 'ForYouCount', 'PopularCount', 'RewatchAfterDays'];
+                const checkFields = ['EnableHomeRow', 'EnableLibrary', 'ShowReasons', 'AllowRewatch'];
+
+                function toggleSmart() {
+                    page.querySelector('.smartOnly').classList.toggle('hide', page.querySelector('#PickMode').value !== 'Smart');
+                }
+
+                function save(update) {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        update(config);
+                        return ApiClient.updatePluginConfiguration(pluginId, config);
+                    }).then(Dashboard.processPluginConfigurationUpdateResult);
+                }
+
+                page.addEventListener('pageshow', function () {
+                    Dashboard.showLoadingMsg();
+                    Promise.all([ApiClient.getPluginConfiguration(pluginId), ApiClient.getUsers()]).then(function ([config, users]) {
+                        textFields.forEach(f => page.querySelector('#' + f).value = config[f]);
+                        numberFields.forEach(f => page.querySelector('#' + f).value = config[f]);
+                        checkFields.forEach(f => page.querySelector('#' + f).checked = config[f]);
+
+                        const excluded = (config.ExcludedUserIds || []).map(id => id.replace(/-/g, '').toLowerCase());
+                        page.querySelector('#TasteUsers').innerHTML = users.map(user =>
+                            '<label><input is="emby-checkbox" type="checkbox" class="tasteUser" data-id="' + user.Id + '"'
+                            + (excluded.includes(user.Id.replace(/-/g, '').toLowerCase()) ? '' : ' checked') + ' />'
+                            + '<span>' + user.Name.replace(/[<>&"]/g, '') + '</span></label>').join('');
+                        toggleSmart();
+                        Dashboard.hideLoadingMsg();
+                    });
+                });
+
+                page.querySelector('#PickMode').addEventListener('change', toggleSmart);
+
+                page.querySelector('#DailyPicksConfigForm').addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    // Re-read the stored config first so values not on this page (shuffle) aren't overwritten.
+                    save(function (config) {
+                        config.Title = page.querySelector('#Title').value || 'Daily Picks';
+                        config.PickMode = page.querySelector('#PickMode').value;
+                        numberFields.forEach(f => config[f] = parseInt(page.querySelector('#' + f).value, 10) || 0);
+                        checkFields.forEach(f => config[f] = page.querySelector('#' + f).checked);
+                        config.ExcludedUserIds = Array.from(page.querySelectorAll('.tasteUser'))
+                            .filter(box => !box.checked)
+                            .map(box => box.getAttribute('data-id'));
+                    });
+                    return false;
+                });
+
+                page.querySelector('#Reshuffle').addEventListener('click', function () {
+                    save(function (config) {
+                        config.ShuffleSalt = Math.floor(Math.random() * 1000000);
+                    });
+                });
+            })();
+        </script>
+    </div>
+</body>
+</html>
