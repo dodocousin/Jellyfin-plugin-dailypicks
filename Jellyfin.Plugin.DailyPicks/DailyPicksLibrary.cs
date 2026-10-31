@@ -41,6 +41,7 @@ public class DailyPicksLibrary
 
     private readonly ILibraryManager _libraryManager;
     private readonly IFileSystem _fileSystem;
+    private readonly IProviderManager _providerManager;
     private readonly ILogger<DailyPicksLibrary> _logger;
 
     /// <summary>
@@ -48,11 +49,13 @@ public class DailyPicksLibrary
     /// </summary>
     /// <param name="libraryManager">Library manager.</param>
     /// <param name="fileSystem">File system.</param>
+    /// <param name="providerManager">Provider manager (saves images to local storage).</param>
     /// <param name="logger">Logger.</param>
-    public DailyPicksLibrary(ILibraryManager libraryManager, IFileSystem fileSystem, ILogger<DailyPicksLibrary> logger)
+    public DailyPicksLibrary(ILibraryManager libraryManager, IFileSystem fileSystem, IProviderManager providerManager, ILogger<DailyPicksLibrary> logger)
     {
         _libraryManager = libraryManager;
         _fileSystem = fileSystem;
+        _providerManager = providerManager;
         _logger = logger;
     }
 
@@ -247,6 +250,8 @@ public class DailyPicksLibrary
         {
             _logger.LogInformation("Daily Picks: new library location, running a full library scan");
             await _libraryManager.ValidateMediaLibrary(new Progress<double>(), cancellationToken).ConfigureAwait(false);
+            physicalFolders = _libraryManager.GetItemById(id) is CollectionFolder scanned ? scanned.GetPhysicalFolders().ToList() : [];
+            await MoveImagesToLocalStorageAsync(physicalFolders, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -254,6 +259,106 @@ public class DailyPicksLibrary
         {
             var refreshOptions = new MetadataRefreshOptions(new DirectoryService(_fileSystem));
             await physical.ValidateChildren(new Progress<double>(), refreshOptions, true, false, cancellationToken).ConfigureAwait(false);
+        }
+
+        await MoveImagesToLocalStorageAsync(physicalFolders, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task MoveImagesToLocalStorageAsync(IEnumerable<Folder> physicalFolders, CancellationToken cancellationToken)
+    {
+        // The scan finds our posters next to the links, on the media drive (often a NAS). Serving them from there makes
+        // every first view slow, and the picks are new every day. So each one is saved into Jellyfin's own metadata
+        // folder (the library doesn't save artwork with media) and the drive copy is deleted.
+        // Works from the files we wrote rather than the item's image list, so it also repairs an item whose image
+        // record went missing.
+        var moved = 0;
+        foreach (var item in physicalFolders.SelectMany(f => f.GetRecursiveChildren()).Where(i => !string.IsNullOrEmpty(i.Path) && IsInPicksFolder(i.Path)))
+        {
+            var changed = false;
+            foreach (var (type, source) in ImageFilesFor(item))
+            {
+                // Read it all first: saving may delete the old file, which Windows refuses while it is open.
+                var bytes = await File.ReadAllBytesAsync(source, cancellationToken).ConfigureAwait(false);
+                using (var stream = new MemoryStream(bytes))
+                {
+                    await _providerManager.SaveImage(item, stream, LibraryImageService.MimeTypes[Path.GetExtension(source)], type, 0, cancellationToken).ConfigureAwait(false);
+                }
+
+                changed = true;
+
+                // Only delete the drive copy once the item really points at a saved local file.
+                // (Don't reuse an ItemImageInfo across SaveImage: Jellyfin updates it in place to the new path.)
+                var saved = item.GetImageInfo(type, 0)?.Path;
+                if (saved is not null && !IsInPicksFolder(saved) && File.Exists(saved))
+                {
+                    TryDeleteFile(source);
+                    moved++;
+                }
+            }
+
+            if (changed)
+            {
+                await item.UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        if (moved > 0)
+        {
+            _logger.LogInformation("Daily Picks: moved {Count} images to Jellyfin's local storage", moved);
+        }
+    }
+
+    /// <summary>
+    /// The image files this plugin writes for an item (see <see cref="WriteMovie"/> and <see cref="WriteSeries"/>).
+    /// </summary>
+    private static IEnumerable<(ImageType Type, string Path)> ImageFilesFor(BaseItem item)
+    {
+        var stems = item switch
+        {
+            Episode episode => [(ImageType.Primary, Path.Combine(Path.GetDirectoryName(episode.Path)!, Path.GetFileNameWithoutExtension(episode.Path) + "-thumb"))],
+            Season season => [(ImageType.Primary, Path.Combine(season.Path, "folder"))],
+            Series series => ArtworkStems(series.Path),
+            Movie movie => ArtworkStems(Path.GetDirectoryName(movie.Path)!),
+            _ => Array.Empty<(ImageType, string)>()
+        };
+
+        foreach (var (type, stem) in stems)
+        {
+            var file = LibraryImageService.MimeTypes.Keys.Select(extension => stem + extension).FirstOrDefault(File.Exists);
+            if (file is not null)
+            {
+                yield return (type, file);
+            }
+        }
+    }
+
+    private static (ImageType, string)[] ArtworkStems(string dir)
+    {
+        return
+        [
+            (ImageType.Primary, Path.Combine(dir, "poster")),
+            (ImageType.Backdrop, Path.Combine(dir, "fanart")),
+            (ImageType.Logo, Path.Combine(dir, "logo"))
+        ];
+    }
+
+    private static bool IsInPicksFolder(string path)
+    {
+        return path.Contains(Path.DirectorySeparatorChar + PicksFolderName + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogDebug(ex, "Daily Picks: could not delete {Path}", path);
         }
     }
 

@@ -39,7 +39,8 @@ holding picked media (e.g. `J:\Jellyfin Daily Picks`). If a hard link isn't poss
 otherwise skips that title. For a picked show only the **first season** is linked (the lowest regular season with files;
 specials only if there is nothing else), so the nightly refresh and scan stay small however long the show is. To keep
 watching after that season, continue in the regular TV library. External subtitles next to the file are linked too. Titles, plots, posters and backdrops are
-copied from your existing metadata (NFO + images), so nothing is downloaded.
+copied from your existing metadata (NFO + images), so nothing is downloaded. After each scan the images are moved into
+Jellyfin's own metadata folder (on the server's disk), so TV apps don't wait for the media drive or NAS to load them.
 
 Things to know:
 - A pick shows up twice in search (original + Daily Picks), and watch progress is tracked separately for each.

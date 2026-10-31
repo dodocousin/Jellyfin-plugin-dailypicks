@@ -24,6 +24,7 @@ public class LibraryImageService
     {
         [".png"] = "image/png",
         [".jpg"] = "image/jpeg",
+        [".jpeg"] = "image/jpeg",
         [".webp"] = "image/webp"
     };
 
@@ -124,7 +125,8 @@ public class LibraryImageService
                 return;
             }
 
-            source = Path.Combine(Plugin.Instance.DataFolderPath, "library-collage.png");
+            // JPEG: a photo collage is ~5x smaller than as PNG, so TVs load the tile faster.
+            source = Path.Combine(Plugin.Instance.DataFolderPath, "library-collage.jpg");
             Directory.CreateDirectory(Plugin.Instance.DataFolderPath);
             if (!TryBuildCollage(posters, config.Title, source))
             {

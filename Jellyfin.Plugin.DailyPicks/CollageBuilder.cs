@@ -17,11 +17,11 @@ public static class CollageBuilder
     private const int Rows = 2;
 
     /// <summary>
-    /// Builds the collage as a PNG.
+    /// Builds the collage as a JPEG.
     /// </summary>
     /// <param name="posters">Poster files (repeated if there are fewer than 10).</param>
     /// <param name="title">Text written in the middle.</param>
-    /// <param name="outputPath">Where to write the PNG.</param>
+    /// <param name="outputPath">Where to write the JPEG.</param>
     public static void Build(IReadOnlyList<string> posters, string title, string outputPath)
     {
         using var surface = SKSurface.Create(new SKImageInfo(Width, Height));
@@ -73,7 +73,7 @@ public static class CollageBuilder
         canvas.DrawText(title, Width / 2f, baseline, SKTextAlign.Center, font, text);
 
         using var snapshot = surface.Snapshot();
-        using var data = snapshot.Encode(SKEncodedImageFormat.Png, 90);
+        using var data = snapshot.Encode(SKEncodedImageFormat.Jpeg, 88);
         using var file = File.Create(outputPath);
         data.SaveTo(file);
     }
