@@ -1,15 +1,13 @@
 # Daily Picks (Jellyfin 12.x plugin)
 
-10 movies and shows picked every day, based on what your users watch.
-
-Picks are made at 00:01 (server time), stay the same all day (also after a restart), and avoid repeats from the last 7 days.
+X number of movies and shows picked every day, based on what your users watch.
 
 ## What you get
 
 Jellyfin apps come in two kinds, and the plugin reaches each in its own way:
 
 - **Web clients** run Jellyfin's web interface, so the plugin can add a row to their home screen.
-- **Native TV apps** build their own home screen, which no plugin can change. For them, the plugin keeps a
+- **Native TV apps** build their own home screen, which no plugin can change
   **Daily Picks library**, and the apps show it as a row like any other library.
 
 | | Web clients | Native TV apps |
